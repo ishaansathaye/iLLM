@@ -1,7 +1,7 @@
 # backend/app/main.py
 from fastapi import FastAPI
 from pydantic import BaseModel
-from models import qa_chain
+from app.models import qa_chain
 
 app = FastAPI()
 
