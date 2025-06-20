@@ -1,0 +1,8 @@
+chromadb
+fastapi
+langchain
+openai
+uvicorn
+langchain-community
+pymupdf
+langchain-openai

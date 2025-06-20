@@ -1,0 +1,67 @@
+Ishaan Sathaye
+Email : ishaan.sathaye@gmail.com
+https://github.com/ishaansathaye
+Mobile : +1(408) 518-1518
+https://www.linkedin.com/in/ishaansathaye
+US Citizen
+Education
+• Georgia Institute of Technology
+Atlanta, GA
+MS in Computer Science
+August 2025 – Present
+• California Polytechnic State University, San Luis Obispo
+San Luis Obispo, CA
+BS in Computer Science-AI/ML and minor in Data Science
+September 2021 – June 2025
+Experience
+• Lucid Motors
+Newark, CA
+Software Engineer Intern
+June 2024 - September 2024
+◦Self-Healing Workflow: Designed and implemented Golang-based automation features for virtual machine
+management that streamlined system operations and reduced overhead costs.
+◦Object Storage Cost Optimization: Engineered a Python-based data analysis tool to optimize data storage
+usage, resulting in a 20% reduction in storage costs.
+• Amazon Web Services Inc.
+Herndon, VA
+Software Engineer Intern
+June 2023 - September 2023
+◦Keycloak Authentication: Enhanced the integration of AWS services with Keycloak by developing secure,
+developer-friendly authentication features in accordance with NIST and AWS security standards in Typescript.
+◦Port Obfuscation: Architected modifications to application connectivity to enhance security and stability,
+including dynamic configuration updates of ECS tasks and RDS clusters that minimized downtime during
+deployments.
+◦AWS Certified: Certified in Data Analytics Specialty.
+Software Engineer Intern
+June 2022 - September 2022
+◦Serverless Application: Developed a Python-based serverless application using AWS Lambda, DynamoDB, and
+CDK to automate meeting generation for Amazon employees. Focused on designing scalable, efficient code and
+implementing robust error handling to ensure reliability.
+◦Code Pipeline: Developed integration solutions that streamlined code management and deployment processes,
+including a pipeline that mirrored Gitlab.
+◦4x AWS Certified: Certified in Cloud Practitioner, Solutions Architect Assoc., Developer Assoc., ML Specialty
+• California Polytechnic State University
+San Luis Obispo, CA
+Research Assistant
+September 2023 - June 2024
+◦Research Assistant: Developed CSB Deep model that sharpens microscopic images from sparse wide field
+images.
+Hack4Impact Technical Lead
+September 2021 - June 2023
+◦Veggie Rescue Team: Managed a team of 5 developers to maintain and improve a progressive web-app for
+non-profit Veggie Rescue.
+◦Progressive Web App: Redesigned database architecture to optimize data access speeds and scalability for
+user-centric applications; created admin login and finance spreadsheet page using Typescript and Tailwind CSS.
+• Cisco Systems, Inc.
+San Jose, CA
+High School Software Developer Intern
+June 2020 - August 2020
+◦In-Band Telemetry System: Designed and implemented an in-band telemetry system—including server/client
+byte-stream IP packet handling and parsing—to extract and deliver IP packet data for Cisco’s ML models.
+Projects
+• Elephant Seal Tracking: Full stack web application to aid marine biologists in tracking and classifying elephant seals
+using Flask and Roboflow.
+• F1 Intelligent Racing: Simulated cars optimally racing around a track using reinforcement learning and evolution.
+• Tulu Language Translation Support: Creating a learning/translating application for spoken languages like ’Tulu’.
+• Personal Movie Recommender: Collaborative filtering to recommend movies based on my watch history and movie
+script.
