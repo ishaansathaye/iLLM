@@ -7,6 +7,7 @@ import InputBar from '@/components/InputBar';
 import Navbar from '@/components/Navbar';
 
 export default function Home() {
+    const apiURL = process.env.NEXT_PUBLIC_API_URL || 'http://illm-backend.fly.dev';
   const [messages, setMessages] = useState<{fromUser:boolean;text:string}[]>([]);
   const fullIntro = "hi, i'm ishaan";
   const [typedIntro, setTypedIntro] = useState("");
@@ -44,13 +45,13 @@ export default function Home() {
   const send = async (text: string) => {
     setShowIntro(false);
     setMessages([...messages, { fromUser: true, text }]);
-    
-    const res = await fetch('https://illm-backend.fly.dev/chat', {
+
+    const res = await fetch(apiURL + '/chat', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({question: text})
     });
-    
+    console.log(res);
     const { answer } = await res.json();
     setMessages(prev => [...prev, { fromUser: false, text: answer }]);
   };
@@ -98,7 +99,7 @@ export default function Home() {
       </div>
 
       {/* Fixed input bar at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 py-2 flex justify-center">
+      <div className="fixed bottom-3 left-0 right-0 px-4 py-2 flex justify-center">
         <div className="w-full max-w-2xl">
           <InputBar onSend={send} onInput={() => setShowIntro(false)} />
         </div>

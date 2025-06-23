@@ -24,7 +24,7 @@ export default function InputBar({ onSend, onInput }: InputBarProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center space-x-2 bg-white/10 backdrop-blur-xs rounded-full px-3 py-2">
+    <form onSubmit={handleSubmit} className="flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-3 py-2">
       <input
         className="flex-1 bg-transparent outline-none text-gray-50"
         placeholder="Type your message…"
