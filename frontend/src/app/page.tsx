@@ -7,8 +7,8 @@ import InputBar from '@/components/InputBar';
 import Navbar from '@/components/Navbar';
 
 export default function Home() {
-    const apiURL = process.env.NEXT_PUBLIC_API_URL || 'http://illm-backend.fly.dev';
-  const [messages, setMessages] = useState<{fromUser:boolean;text:string}[]>([]);
+  const apiURL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+  const [messages, setMessages] = useState<{fromUser:boolean; text:string}[]>([]);
   const fullIntro = "hi, i'm ishaan";
   const [typedIntro, setTypedIntro] = useState("");
   const [showIntro, setShowIntro] = useState(true);
@@ -48,7 +48,10 @@ export default function Home() {
 
     const res = await fetch(apiURL + '/chat', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {
+        'Content-Type':'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_API_TOKEN}`
+      },
       body: JSON.stringify({question: text})
     });
     console.log(res);
