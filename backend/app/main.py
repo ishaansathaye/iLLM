@@ -1,18 +1,18 @@
 # backend/app/main.py
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 from app.models import qa_chain
 from fastapi.middleware.cors import CORSMiddleware
+from app.auth import require_token
 
 # Load environment variables from .env file
 load_dotenv()
 
 app = FastAPI()
 
- # Pull frontend URL from environment, default to localhost for development
+# Pull frontend URL from environment, default to localhost for development
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # Allow requests from frontend URL
@@ -24,17 +24,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-API_TOKEN = os.getenv("BACKEND_TOKEN")
-bearer_scheme = HTTPBearer()
-
-def require_token(creds: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
-    if creds.scheme.lower() != "bearer" or creds.credentials != API_TOKEN:
-        raise HTTPException(status_code=403, detail="Invalid or missing token")
-
 class Query(BaseModel):
     question: str
 
+# Register admin ingestion routes
+from app.routers.ingest import router as ingest_router
+app.include_router(ingest_router)
+
 @app.post("/chat")
-def chat(query: Query, token: HTTPAuthorizationCredentials = Depends(require_token)):
+def chat(query: Query, token = Depends(require_token)):
     answer = qa_chain.run(query.question)
     return {"answer": answer}
