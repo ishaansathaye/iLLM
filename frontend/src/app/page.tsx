@@ -30,7 +30,6 @@ export default function Home() {
       // Calculate the position to show the newest message at the top
       const lastMessageIndex = messages.length - 1;
       const messageElements = scrollRef.current.querySelectorAll('[data-message]');
-      
       if (messageElements.length > 0) {
         const lastMessage = messageElements[lastMessageIndex] as HTMLElement;
         if (lastMessage) {
@@ -45,7 +44,6 @@ export default function Home() {
   const send = async (text: string) => {
     setShowIntro(false);
     setMessages([...messages, { fromUser: true, text }]);
-
     const res = await fetch(apiURL + '/chat', {
       method: 'POST',
       headers: {
@@ -60,13 +58,11 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen flex flex-col">
-      <Navbar onAvatarClick={() => {
-        /* TODO: navigate to admin page */
-      }} />
+    <div className="h-screen flex flex-col bg-gradient-to-br from-gray-900 via-black to-gray-800">
+      <Navbar />
       
       {/* Scrollable content area */}
-      <div 
+      <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto"
       >
@@ -78,7 +74,7 @@ export default function Home() {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex-1 flex items-center justify-center text-center text-2xl font-semibold"
+                className="flex-1 flex items-center justify-center text-center text-2xl font-semibold text-white"
               >
                 <div>
                   {typedIntro}
@@ -94,13 +90,12 @@ export default function Home() {
               </motion.div>
             )}
           </AnimatePresence>
-          
           <ChatLayout>
             <MessageList messages={messages} />
           </ChatLayout>
         </div>
       </div>
-
+      
       {/* Fixed input bar at bottom */}
       <div className="fixed bottom-3 left-0 right-0 px-4 py-2 flex justify-center">
         <div className="w-full max-w-2xl">

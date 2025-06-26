@@ -10,7 +10,7 @@ from langchain.schema import Document
 from app.auth import require_token
 
 
-CHROMA_DB_DIR = os.getenv("CHROMA_DB_DIR", "backend/app/data/chroma_db")
+CHROMA_DB_DIR = os.getenv("CHROMA_DB_DIR", "app/data/chroma_db")
 ingest_jobs: dict = {}
 
 
