@@ -7,3 +7,4 @@ langchain-community
 pymupdf
 langchain-openai
 python-multipart
+supabase

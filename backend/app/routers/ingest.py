@@ -7,7 +7,7 @@ from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, B
 import uuid
 from langchain.schema import Document
 
-from app.auth import require_token
+from app.auth import get_current_role
 
 
 CHROMA_DB_DIR = os.getenv("CHROMA_DB_DIR", "app/data/chroma_db")
@@ -53,7 +53,6 @@ def _process_ingestion(job_id: str, temp_path: Optional[str], text: Optional[str
 
 router = APIRouter(
     prefix="/admin",
-    dependencies=[Depends(require_token)],
     tags=["admin"],
 )
 
@@ -64,10 +63,14 @@ async def ingest(
     file: UploadFile = File(None),
     source: str = Form(...),
     text: Optional[str] = Form(None),
+    role: str = Depends(get_current_role),
 ):
     """
     Ingest a file (PDF, Markdown, text) or raw text into ChromaDB with the given source label.
     """
+    if role != "trusted":
+        raise HTTPException(status_code=403, detail="Admins only")
+
     docs = []
 
     temp_path = None

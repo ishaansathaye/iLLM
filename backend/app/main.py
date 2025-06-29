@@ -5,7 +5,7 @@ from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 from app.models import qa_chain
 from fastapi.middleware.cors import CORSMiddleware
-from app.auth import require_token
+from app.auth import get_current_role
 
 # Load environment variables from .env file
 load_dotenv()
@@ -32,6 +32,6 @@ from app.routers.ingest import router as ingest_router
 app.include_router(ingest_router)
 
 @app.post("/chat")
-def chat(query: Query, token = Depends(require_token)):
+def chat(query: Query, role: str = Depends(get_current_role)):
     answer = qa_chain.run(query.question)
     return {"answer": answer}

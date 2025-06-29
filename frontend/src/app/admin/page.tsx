@@ -11,8 +11,12 @@ import {
   Tag,
 } from "lucide-react";
 import Navbar from '@/components/Navbar';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function AdminPage() {
+  const router = useRouter();
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [file, setFile] = useState<File | null>(null);
   const [source, setSource] = useState("");
   const [text, setText] = useState("");
@@ -21,6 +25,16 @@ export default function AdminPage() {
   const [isDragging, setIsDragging] = useState(false);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   const token = process.env.NEXT_PUBLIC_API_TOKEN;
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) {
+        router.replace('/login');
+      } else {
+        setCheckingAuth(false);
+      }
+    });
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent | React.MouseEvent) => {
     e.preventDefault();
@@ -68,6 +82,10 @@ export default function AdminPage() {
 
     return () => clearInterval(interval);
   }, [jobId, apiUrl, token]);
+
+  if (checkingAuth) {
+    return null;
+  }
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
