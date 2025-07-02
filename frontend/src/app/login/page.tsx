@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import Navbar from '@/components/Navbar';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -146,6 +147,19 @@ export default function LoginPage() {
             </motion.div>
           </motion.form>
 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.65 }}
+            className="mt-4 text-center"
+          >
+            <p className="text-gray-400 text-sm">
+              Don&apos;t have an account?{' '}
+              <Link href="/register" className="text-blue-400 hover:text-blue-300 font-semibold">
+                Register
+              </Link>
+            </p>
+          </motion.div>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

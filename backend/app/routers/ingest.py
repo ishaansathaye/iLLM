@@ -68,7 +68,7 @@ async def ingest(
     """
     Ingest a file (PDF, Markdown, text) or raw text into ChromaDB with the given source label.
     """
-    if role != "trusted":
+    if role != "admin":
         raise HTTPException(status_code=403, detail="Admins only")
 
     docs = []

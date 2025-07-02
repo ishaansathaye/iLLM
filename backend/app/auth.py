@@ -30,7 +30,22 @@ async def get_current_role(
         except Exception:
             user = None
     if user:
-        return "trusted"
+        # Lookup actual role from profiles table
+        try:
+            profile_resp = (
+                supabase
+                .table("profiles")
+                .select("role")
+                .eq("id", user.id)
+                .maybe_single()
+                .execute()
+            )
+            profile = getattr(profile_resp, "data", {}) or {}
+            role = profile.get("role")
+        except Exception:
+            role = None
+        # Fallback to trusted if no profile entry or error
+        return role or "trusted"
 
     # 2) Demo user: must provide session ID
     if not session_id:

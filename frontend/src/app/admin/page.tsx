@@ -27,13 +27,25 @@ export default function AdminPage() {
   const token = process.env.NEXT_PUBLIC_API_TOKEN;
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
+    (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
+      if (!session) {
+        router.replace('/login');
+        return;
+      }
+      // Lookup actual role from profiles table
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+      if (error || profile?.role !== 'admin') {
         router.replace('/login');
       } else {
         setCheckingAuth(false);
       }
-    });
+    })();
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent | React.MouseEvent) => {

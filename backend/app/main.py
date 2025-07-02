@@ -31,6 +31,10 @@ class Query(BaseModel):
 from app.routers.ingest import router as ingest_router
 app.include_router(ingest_router)
 
+# Register admin registration routes
+from app.routers.register import router as register_router
+app.include_router(register_router)
+
 @app.post("/chat")
 def chat(query: Query, role: str = Depends(get_current_role)):
     answer = qa_chain.run(query.question)
