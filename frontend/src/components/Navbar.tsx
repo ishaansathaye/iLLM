@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -10,12 +10,17 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [role, setRole] = useState<'admin'|'trusted'|'demo'>('demo');
+  const [email, setEmail] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const pathname = usePathname() || '/';
+  const router = useRouter();
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       const session = data.session;
       if (session) {
+        setEmail(session.user.email ?? null);
+        setIsLoggedIn(true);
         // fetch profile to get real role
         const { data: profile, error } = await supabase
           .from('profiles')
@@ -28,14 +33,19 @@ export default function Navbar() {
           setRole('trusted');
         }
       } else {
+        setIsLoggedIn(false);
         setRole('demo');
+        setEmail(null);
       }
     });
 
-    // subscribe to auth changes (optional)
+    // subscribe to auth changes
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
+        setIsLoggedIn(false);
         setRole('demo');
+      } else {
+        setIsLoggedIn(true);
       }
     });
     return () => listener.subscription.unsubscribe();
@@ -47,6 +57,16 @@ export default function Navbar() {
     ? '/avatars/user.png'
     : '/avatars/demo.png';
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setOpen(false);
+      router.push('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
   let menuItems;
   if (pathname.startsWith('/login') || pathname.startsWith('/register')) {
     // On login or register page: show Chat & Admin
@@ -55,17 +75,31 @@ export default function Navbar() {
       { label: 'Admin', href: '/admin' },
     ];
   } else if (pathname.startsWith('/admin')) {
-    // On admin console: show Log In & Chat
-    menuItems = [
-      { label: 'Log In', href: '/login' },
-      { label: 'Chat', href: '/' },
-    ];
+    // On admin console: show appropriate items based on login status
+    if (isLoggedIn) {
+      menuItems = [
+        { label: 'Chat', href: '/' },
+        { label: 'Log Out', action: handleLogout },
+      ];
+    } else {
+      menuItems = [
+        { label: 'Log In', href: '/login' },
+        { label: 'Chat', href: '/' },
+      ];
+    }
   } else {
-    // On chat: show Admin & Log In
-    menuItems = [
-      { label: 'Admin', href: '/admin' },
-      { label: 'Log In', href: '/login' },
-    ];
+    // On chat: show appropriate items based on login status
+    if (isLoggedIn) {
+      menuItems = [
+        { label: 'Admin', href: '/admin' },
+        { label: 'Log Out', action: handleLogout },
+      ];
+    } else {
+      menuItems = [
+        { label: 'Admin', href: '/admin' },
+        { label: 'Log In', href: '/login' },
+      ];
+    }
   }
 
   useEffect(() => { 
@@ -130,49 +164,86 @@ export default function Navbar() {
               >
                 {/* Dropdown header */}
                 <div className="px-4 py-3 border-b border-white/10">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide font-semibold">
-                    Navigation
-                  </div>
+                  {email ? (
+                    <div className="text-sm text-gray-200 font-medium">
+                      {email.split('@')[0]}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-400 uppercase tracking-wide font-semibold">
+                      Navigation
+                    </div>
+                  )}
                 </div>
 
                 {/* Menu items */}
                 <div className="py-2">
                   {menuItems.map((item, index) => (
                     <motion.div
-                      key={item.href}
+                      key={item.href || item.label}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
                     >
-                      <Link
-                        href={item.href}
-                        className="block px-4 py-3 text-gray-200 hover:text-white hover:bg-white/10 transition-all duration-200 group"
-                        onClick={() => setOpen(false)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{item.label}</span>
-                          <motion.div
-                            className="opacity-0 group-hover:opacity-100"
-                            initial={false}
-                            animate={{ x: 0 }}
-                            whileHover={{ x: 2 }}
-                          >
-                            <svg
-                              className="w-4 h-4 text-gray-400"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
+                      {item.href ? (
+                        <Link
+                          href={item.href}
+                          className="block px-4 py-3 text-gray-200 hover:text-white hover:bg-white/10 transition-all duration-200 group"
+                          onClick={() => setOpen(false)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{item.label}</span>
+                            <motion.div
+                              className="opacity-0 group-hover:opacity-100"
+                              initial={false}
+                              animate={{ x: 0 }}
+                              whileHover={{ x: 2 }}
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 5l7 7-7 7"
-                              />
-                            </svg>
-                          </motion.div>
-                        </div>
-                      </Link>
+                              <svg
+                                className="w-4 h-4 text-gray-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 5l7 7-7 7"
+                                />
+                              </svg>
+                            </motion.div>
+                          </div>
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={item.action}
+                          className="w-full text-left block px-4 py-3 text-gray-200 hover:text-white hover:bg-white/10 transition-all duration-200 group"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{item.label}</span>
+                            <motion.div
+                              className="opacity-0 group-hover:opacity-100"
+                              initial={false}
+                              animate={{ x: 0 }}
+                              whileHover={{ x: 2 }}
+                            >
+                              <svg
+                                className="w-4 h-4 text-gray-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M17 16l4-4m0 0l-4-4m4 4H7"
+                                />
+                              </svg>
+                            </motion.div>
+                          </div>
+                        </button>
+                      )}
                     </motion.div>
                   ))}
                 </div>

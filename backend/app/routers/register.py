@@ -1,5 +1,3 @@
-
-
 from fastapi import APIRouter, HTTPException, Depends
 from starlette.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from pydantic import BaseModel
@@ -9,6 +7,7 @@ from postgrest.exceptions import APIError
 
 from app.lib.supabase_client import supabase
 from app.auth import get_current_role
+from app.lib.mailer import send_user_password_email
 
 router = APIRouter(tags=["auth"])
 
@@ -48,13 +47,13 @@ async def register(req: RegisterRequest):
             return {"status": "pending", "message": "Your request is already pending approval."}
         # unexpected error
         raise HTTPException(status_code=500, detail="Registration failed.")
-    # TODO: send notification to admin (email/SMS)
+    
     return {"status": "ok", "message": "Registration request received"}
 
 @router.post("/admin/approve/{request_id}")
 async def approve_request(request_id: str, role: str = Depends(get_current_role)):
-    # Only trusted/admin users may approve
-    if role not in ("trusted", "admin"):
+    # Only admins may approve
+    if role != "admin":
         raise HTTPException(status_code=403, detail="Admins only")
 
     # Fetch the pending request
@@ -66,7 +65,8 @@ async def approve_request(request_id: str, role: str = Depends(get_current_role)
         .maybe_single()
         .execute()
     )
-    if req_res.error or not getattr(req_res, "data", None):
+    if not getattr(req_res, "data", None):
+        # No matching pending request found
         raise HTTPException(status_code=404, detail="Request not found")
     email = req_res.data["email"]
 
@@ -82,8 +82,9 @@ async def approve_request(request_id: str, role: str = Depends(get_current_role)
         .eq("id", request_id)
         .execute()
     )
-    if upd_res.error:
-        raise HTTPException(status_code=500, detail=upd_res.error.message)
+    # Ensure the update actually affected the row
+    if not getattr(upd_res, "data", None):
+        raise HTTPException(status_code=500, detail="Failed to mark request approved")
 
     # Generate a one-time password
     password = secrets.token_urlsafe(8)
@@ -96,8 +97,131 @@ async def approve_request(request_id: str, role: str = Depends(get_current_role)
         "email_confirm": True,
         "user_metadata": {"role": "trusted", "expires_at": expires_at}
     })
-    if user_res.error:
-        raise HTTPException(status_code=500, detail=user_res.error.message)
+    # Ensure the user was created successfully
+    if not getattr(user_res, "user", None):
+        raise HTTPException(status_code=500, detail="Failed to create user")
 
-    # TODO: send the password to the user via email/SMS
+    # Send the password via email
+    send_user_password_email(email, password, expires_at)
+
+    # Delete the pending request
+    del_resp = (
+        supabase
+        .table("pending_requests")
+        .delete()
+        .eq("id", request_id)
+        .execute()
+    )
+    # If no row was deleted, treat as not found
+    if getattr(del_resp, "count", 0) == 0:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    # Manually upsert into your public.profiles table
+    supabase.table("profiles").upsert({
+        "id": user_res.user.id,
+        "role": "trusted",
+        "expires_at": expires_at,
+    }).execute()
+
     return {"status": "ok", "user_id": user_res.user.id}
+
+
+# Deny endpoint: admins only
+@router.post("/admin/deny/{request_id}")
+async def deny_request(request_id: str, role: str = Depends(get_current_role)):
+    # Only admins may deny
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admins only")
+
+    # Remove the pending request
+    resp = (
+        supabase
+        .table("pending_requests")
+        .delete()
+        .eq("id", request_id)
+        .execute()
+    )
+    # If no row was deleted, treat as not found
+    if getattr(resp, "count", 0) == 0:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    # TODO: optionally notify the user that their request was denied
+
+    return {"status": "denied", "request_id": request_id}
+
+# List Pending Requests
+@router.get("/admin/pending")
+async def list_pending_requests(role: str = Depends(get_current_role)):
+    # Only admins may list
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admins only")
+    resp = supabase.table("pending_requests") \
+        .select("id, email, created_at") \
+        .eq("is_approved", False) \
+        .execute()
+    return getattr(resp, "data", [])
+
+# List Active Users
+@router.get("/admin/active-users")
+async def list_active_users(role: str = Depends(get_current_role)):
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admins only")
+    # Fetch all active profile rows
+    now_iso = datetime.utcnow().isoformat()
+    resp = (
+        supabase
+        .table("profiles")
+        .select("id, role, expires_at")
+        .in_("role", ["trusted", "admin"])
+        .gt("expires_at", now_iso)
+        .execute()
+    )
+    profiles = getattr(resp, "data", []) or []
+    result = []
+    for p in profiles:
+        user_id = p.get("id")
+        # Fetch the user's email via Admin API
+        try:
+            user_res = supabase.auth.admin.get_user(user_id)
+            email = getattr(user_res, "user", {}).get("email")
+        except Exception:
+            email = None
+        result.append({
+            "id": user_id,
+            "email": email,
+            "role": p.get("role"),
+            "expires_at": p.get("expires_at"),
+        })
+    return result
+
+# List Expired Users
+@router.get("/admin/expired-users")
+async def list_expired_users(role: str = Depends(get_current_role)):
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admins only")
+    # Fetch all expired profile rows
+    now_iso = datetime.utcnow().isoformat()
+    resp = (
+        supabase
+        .table("profiles")
+        .select("id, role, expires_at")
+        .in_("role", ["trusted", "admin"])
+        .lte("expires_at", now_iso)
+        .execute()
+    )
+    profiles = getattr(resp, "data", []) or []
+    result = []
+    for p in profiles:
+        user_id = p.get("id")
+        try:
+            user_res = supabase.auth.admin.get_user(user_id)
+            email = getattr(user_res, "user", {}).get("email")
+        except Exception:
+            email = None
+        result.append({
+            "id": user_id,
+            "email": email,
+            "role": p.get("role"),
+            "expires_at": p.get("expires_at"),
+        })
+    return result
