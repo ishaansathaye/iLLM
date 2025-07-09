@@ -3,7 +3,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 SG_API_KEY = os.getenv("SENDGRID_API_KEY")
-FROM_EMAIL = "no-reply@mail.illm-issat.online"
+FROM_EMAIL = "no-reply@illm-issat.online"
 
 def send_user_password_email(to_email: str, password: str, expires_at: str):
     """
