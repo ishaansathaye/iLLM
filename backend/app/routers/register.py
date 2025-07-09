@@ -149,6 +149,41 @@ async def deny_request(request_id: str, role: str = Depends(get_current_role)):
 
     return {"status": "denied", "request_id": request_id}
 
+from datetime import datetime
+
+@router.post("/admin/revoke/{user_id}")
+async def revoke_user(
+    user_id: str,
+    role: str = Depends(get_current_role)
+):
+    # only admins may revoke
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admins only")
+
+    # set expiration immediately
+    now_iso = datetime.utcnow().isoformat()
+    resp = (
+        supabase
+        .table("profiles")
+        .update({"expires_at": now_iso})
+        .eq("id", user_id)
+        .execute()
+    )
+    if not getattr(resp, "data", None):
+        raise HTTPException(status_code=404, detail="User profile not found")
+
+    # Disable the user's authentication so they can't sign in anymore
+    disable_res = supabase.auth.admin.update_user_by_id(
+        user_id,
+        {"disabled": True}
+    )
+    # Optionally check result
+    if not getattr(disable_res, "user", None):
+        raise HTTPException(status_code=500, detail="Failed to disable user login")
+
+    # TODO: optionally notify the user that their access was revoked
+    return {"status": "revoked", "user_id": user_id, "expired_at": now_iso}
+
 # List Pending Requests
 @router.get("/admin/pending")
 async def list_pending_requests(role: str = Depends(get_current_role)):
@@ -181,11 +216,9 @@ async def list_active_users(role: str = Depends(get_current_role)):
     for p in profiles:
         user_id = p.get("id")
         # Fetch the user's email via Admin API
-        try:
-            user_res = supabase.auth.admin.get_user(user_id)
-            email = getattr(user_res, "user", {}).get("email")
-        except Exception:
-            email = None
+        user_res = supabase.auth.admin.get_user_by_id(user_id)
+        # Supabase Admin API returns a UserResponse with .user
+        email = user_res.user.email if getattr(user_res, "user", None) else None
         result.append({
             "id": user_id,
             "email": email,
@@ -214,14 +247,18 @@ async def list_expired_users(role: str = Depends(get_current_role)):
     for p in profiles:
         user_id = p.get("id")
         try:
-            user_res = supabase.auth.admin.get_user(user_id)
-            email = getattr(user_res, "user", {}).get("email")
+            user_res = supabase.auth.admin.get_user_by_id(user_id)
+            # Supabase Admin API returns a UserResponse with .user
+            email = user_res.user.email if getattr(user_res, "user", None) else None
+            created_at = user_res.user.created_at if getattr(user_res, "user", None) else None
         except Exception:
             email = None
+            created_at = None
         result.append({
             "id": user_id,
             "email": email,
             "role": p.get("role"),
+            "created_at": created_at,
             "expires_at": p.get("expires_at"),
         })
     return result

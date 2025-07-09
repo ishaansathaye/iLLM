@@ -266,6 +266,28 @@ export default function AdminPage() {
     });
   };
 
+  const handleRevoke = async (id: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiUrl}/admin/revoke/${id}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (res.ok) {
+        await fetchUserData();
+      } else {
+        console.error('Failed to revoke user', await res.text());
+      }
+    } catch (err) {
+      console.error('Error revoking user', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const UserTable = ({ users, title, type, icon }: { 
     users: User[], 
     title: string, 
@@ -297,8 +319,15 @@ export default function AdminPage() {
               <tr className="border-b border-white/10">
                 <th className="text-left py-4 px-6 text-gray-300 font-medium">User</th>
                 <th className="text-left py-4 px-6 text-gray-300 font-medium">Email</th>
-                <th className="text-left py-4 px-6 text-gray-300 font-medium">Date</th>
-                {type === 'active' && <th className="text-left py-4 px-6 text-gray-300 font-medium">Expires</th>}
+                {(type === 'pending' || type === 'expired') && (
+                  <th className="text-left py-4 px-6 text-gray-300 font-medium">Date</th>
+                )}
+                {type === 'active' && (
+                  <>
+                    <th className="text-left py-4 px-6 text-gray-300 font-medium">Expires</th>
+                    <th className="text-right py-4 px-6 text-gray-300 font-medium">Actions</th>
+                  </>
+                )}
                 {type === 'pending' && <th className="text-right py-4 px-6 text-gray-300 font-medium">Actions</th>}
               </tr>
             </thead>
@@ -311,7 +340,9 @@ export default function AdminPage() {
                         <span className="text-white font-medium text-sm">
                           {user.name
                             ? user.name.charAt(0)
-                            : user.email.charAt(0).toUpperCase()}
+                            : user.email
+                              ? user.email.charAt(0).toUpperCase()
+                              : '?'}
                         </span>
                       </div>
                       <div>
@@ -319,7 +350,9 @@ export default function AdminPage() {
                         <span className="text-white font-medium">
                           {user.name
                             ? user.name
-                            : user.email.split('@')[0]}
+                            : user.email
+                              ? user.email.split('@')[0]
+                              : ''}
                         </span>
                         <p className="text-gray-400 text-sm">{user.id}</p>
                       </div>
@@ -331,24 +364,37 @@ export default function AdminPage() {
                       <span className="text-white">{user.email}</span>
                     </div>
                   </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-300">
-                        {user.created_at
-                          ? formatDate(user.created_at)
-                          : '—'}
-                      </span>
-                    </div>
-                  </td>
-                  {type === 'active' && (
+                  {(type === 'pending' || type === 'expired') && (
                     <td className="py-4 px-6">
-                      <span className="text-gray-300">
-                        {user.expires_at
-                          ? formatDate(user.expires_at)
-                          : '—'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-300">
+                          {type === 'expired'
+                            ? (user.expires_at ? formatDate(user.expires_at) : '—')
+                            : (user.created_at ? formatDate(user.created_at) : '—')}
+                        </span>
+                      </div>
                     </td>
+                  )}
+                  {type === 'active' && (
+                    <>
+                      <td className="py-4 px-6">
+                        <span className="text-gray-300">
+                          {user.expires_at
+                            ? formatDate(user.expires_at)
+                            : '—'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <button
+                          onClick={() => handleRevoke(user.id)}
+                          disabled={loading}
+                          className="bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 px-4 py-2 rounded-lg text-sm transition-all duration-200 backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </>
                   )}
                   {type === 'pending' && (
                     <td className="py-4 px-6">
