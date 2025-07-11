@@ -118,6 +118,8 @@ export default function Home() {
         body: JSON.stringify({ question: text }),
       });
       
+      console.log('API response status:', res.status);
+      console.log('API response headers:', Array.from(res.headers.entries()));
       if (res.status === 401) {
         // user has been revoked or session expired
         await supabase.auth.signOut();
