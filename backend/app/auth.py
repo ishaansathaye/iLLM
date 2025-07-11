@@ -45,7 +45,18 @@ async def get_current_role(
         except Exception:
             role = None
         # Fallback to trusted if no profile entry or error
-        return role or "trusted"
+        final_role = role or "trusted"
+
+        # --- New disabled check ---
+        # Fetch admin user record to see if account is disabled
+        admin_res = supabase.auth.admin.get_user_by_id(user.id)
+        admin_user = getattr(admin_res, "data", None)
+        if admin_user and admin_user.get("disabled", False):
+            # Revoke any lingering sessions
+            supabase.auth.admin.delete_user_sessions(user.id).execute()
+            raise HTTPException(status_code=401, detail="Account revoked")
+
+        return final_role
 
     # 2) Demo user: must provide session ID
     if not session_id:

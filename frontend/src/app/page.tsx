@@ -118,6 +118,13 @@ export default function Home() {
         body: JSON.stringify({ question: text }),
       });
       
+      if (res.status === 401) {
+        // user has been revoked or session expired
+        await supabase.auth.signOut();
+        router.replace('/login');
+        return;
+      }
+      
       if (res.status === 403) {
         setIsDemoBlocked(true);
         return;

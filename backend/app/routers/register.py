@@ -160,29 +160,16 @@ async def revoke_user(
     if role != "admin":
         raise HTTPException(status_code=403, detail="Admins only")
 
-    # set expiration immediately
-    now_iso = datetime.utcnow().isoformat()
-    resp = (
-        supabase
-        .table("profiles")
-        .update({"expires_at": now_iso})
-        .eq("id", user_id)
-        .execute()
-    )
-    if not getattr(resp, "data", None):
-        raise HTTPException(status_code=404, detail="User profile not found")
+    # First, delete from the profiles table to remove the foreign key constraint
+    supabase.table("profiles").delete().eq("id", user_id).execute()
 
-    # Disable the user's authentication so they can't sign in anymore
-    disable_res = supabase.auth.admin.update_user_by_id(
-        user_id,
-        {"disabled": True}
-    )
-    # Optionally check result
-    if not getattr(disable_res, "user", None):
-        raise HTTPException(status_code=500, detail="Failed to disable user login")
+    # Then delete the user from Supabase Auth - this will:
+    # 1. Prevent them from logging in
+    # 2. Invalidate all their existing sessions immediately
+    # 3. Remove them from Supabase Auth
+    supabase.auth.admin.delete_user(user_id)
 
-    # TODO: optionally notify the user that their access was revoked
-    return {"status": "revoked", "user_id": user_id, "expired_at": now_iso}
+    return {"status": "revoked", "user_id": user_id}
 
 # List Pending Requests
 @router.get("/admin/pending")
@@ -223,42 +210,6 @@ async def list_active_users(role: str = Depends(get_current_role)):
             "id": user_id,
             "email": email,
             "role": p.get("role"),
-            "expires_at": p.get("expires_at"),
-        })
-    return result
-
-# List Expired Users
-@router.get("/admin/expired-users")
-async def list_expired_users(role: str = Depends(get_current_role)):
-    if role != "admin":
-        raise HTTPException(status_code=403, detail="Admins only")
-    # Fetch all expired profile rows
-    now_iso = datetime.utcnow().isoformat()
-    resp = (
-        supabase
-        .table("profiles")
-        .select("id, role, expires_at")
-        .in_("role", ["trusted", "admin"])
-        .lte("expires_at", now_iso)
-        .execute()
-    )
-    profiles = getattr(resp, "data", []) or []
-    result = []
-    for p in profiles:
-        user_id = p.get("id")
-        try:
-            user_res = supabase.auth.admin.get_user_by_id(user_id)
-            # Supabase Admin API returns a UserResponse with .user
-            email = user_res.user.email if getattr(user_res, "user", None) else None
-            created_at = user_res.user.created_at if getattr(user_res, "user", None) else None
-        except Exception:
-            email = None
-            created_at = None
-        result.append({
-            "id": user_id,
-            "email": email,
-            "role": p.get("role"),
-            "created_at": created_at,
             "expires_at": p.get("expires_at"),
         })
     return result

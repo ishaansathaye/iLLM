@@ -46,7 +46,6 @@ export default function AdminPage() {
   // User management states
   const [pending, setPending] = useState<User[]>([]);
   const [active, setActive] = useState<User[]>([]);
-  const [expired, setExpired] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -85,25 +84,20 @@ export default function AdminPage() {
   const fetchUserData = async () => {
     if (!token) return;
     try {
-      const [pendingRes, activeRes, expiredRes] = await Promise.all([
+      const [pendingRes, activeRes] = await Promise.all([
         fetch(`${apiUrl}/admin/pending`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch(`${apiUrl}/admin/active-users`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch(`${apiUrl}/admin/expired-users`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
       ]);
-      const [pendingData, activeData, expiredData] = await Promise.all([
+      const [pendingData, activeData] = await Promise.all([
         pendingRes.json(),
         activeRes.json(),
-        expiredRes.json()
       ]);
       setPending(pendingData);
       setActive(activeData);
-      setExpired(expiredData);
     } catch (error) {
       console.error('Failed to fetch user data:', error);
     }
@@ -653,13 +647,6 @@ export default function AdminPage() {
                 title="Active Users"
                 type="active"
                 icon={<Shield className="w-6 h-6 text-green-400" />}
-              />
-              
-              <UserTable
-                users={expired}
-                title="Expired Users"
-                type="expired"
-                icon={<XCircle className="w-6 h-6 text-red-400" />}
               />
             </div>
           )}
