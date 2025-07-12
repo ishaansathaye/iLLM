@@ -89,7 +89,7 @@ export default function RegisterPage() {
                 transition={{ delay: 0.5 }}
                 className="text-blue-400 hover:text-blue-300 text-sm transition-colors duration-200"
               >
-                ← Back to Demo
+                ← Back to Chat
               </motion.button>
             </motion.div>
           </motion.div>
@@ -205,7 +205,7 @@ export default function RegisterPage() {
               onClick={() => router.push('/')}
               className="text-gray-400 hover:text-white text-sm transition-colors duration-200"
             >
-              ← Back to Demo
+              ← Back to Chat
             </button>
           </motion.div>
         </motion.div>

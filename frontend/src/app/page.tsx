@@ -1,41 +1,128 @@
-'use client';
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import ChatLayout from '@/components/ChatLayout';
-import MessageList from '@/components/MessageList';
-import InputBar from '@/components/InputBar';
-import Navbar from '@/components/Navbar';
-import { supabase } from '@/lib/supabaseClient';
-import detectIncognito from 'detectincognitojs';
+"use client";
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import ChatLayout from "@/components/ChatLayout";
+import MessageList from "@/components/MessageList";
+import InputBar from "@/components/InputBar";
+import Navbar from "@/components/Navbar";
+import { supabase } from "@/lib/supabaseClient";
+import detectIncognito from "detectincognitojs";
 
 export default function Home() {
   const router = useRouter();
   const [isCheckingPrivateMode, setIsCheckingPrivateMode] = useState(true);
   const [isPrivateMode, setIsPrivateMode] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  const apiURL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+  const [sessionId] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      let sid = window.localStorage.getItem("demoSessionId");
+      if (!sid) {
+        sid = crypto.randomUUID();
+        window.localStorage.setItem("demoSessionId", sid);
+      }
+      return sid;
+    } catch {
+      return crypto.randomUUID();
+    }
+  });
+
+  // Check authentication status on page load and periodically
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session?.access_token) {
+          // Test if the user's access is still valid by making a simple request
+          const testResponse = await fetch(`${apiURL}/auth/verify`, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              "X-Session-Id": sessionId,
+            },
+          });
+
+          if (testResponse.status === 401 || testResponse.status === 403) {
+            // User has been revoked or session expired
+            await supabase.auth.signOut();
+            router.replace("/login");
+            return;
+          }
+        } else {
+          // For demo users, test with session ID only
+          const testResponse = await fetch(`${apiURL}/auth/verify`, {
+            method: "GET",
+            headers: {
+              "X-Session-Id": sessionId,
+            },
+          });
+
+          if (testResponse.status === 403) {
+            // Demo limit reached
+            setIsDemoBlocked(true);
+          }
+        }
+
+        setIsCheckingAuth(false);
+      } catch (error) {
+        console.error("Error checking auth status:", error);
+        setIsCheckingAuth(false);
+      }
+    };
+
+    // Check auth status on page load
+    checkAuthStatus();
+
+    // Set up periodic auth check every 30 seconds
+    const authCheckInterval = setInterval(checkAuthStatus, 30000);
+
+    return () => clearInterval(authCheckInterval);
+  }, [router, apiURL, sessionId]);
+
+  // Listen for auth state changes from Supabase
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        // User signed out or session expired
+        router.replace("/login");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   // Simple and reliable private browsing detection using detectIncognito.js
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     const detectPrivateBrowsing = async () => {
       try {
-        console.log('Running detectIncognito.js...');
-        
+        console.log("Running detectIncognito.js...");
+
         const result = await detectIncognito();
-        console.log(`Browser: ${result.browserName}, Private: ${result.isPrivate}`);
+        console.log(
+          `Browser: ${result.browserName}, Private: ${result.isPrivate}`
+        );
 
         if (result.isPrivate) {
           setIsPrivateMode(true);
           setTimeout(() => {
-            router.replace('/login');
+            router.replace("/login");
           }, 3000);
         } else {
           setIsCheckingPrivateMode(false);
         }
-
       } catch (error) {
-        console.error('Error detecting private browsing:', error);
+        console.error("Error detecting private browsing:", error);
         // If detection fails, assume normal browsing and continue
         setIsCheckingPrivateMode(false);
       }
@@ -45,23 +132,9 @@ export default function Home() {
     setTimeout(detectPrivateBrowsing, 200);
   }, [router]);
 
-  const apiURL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-  
-  const [sessionId] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    try {
-      let sid = window.localStorage.getItem('demoSessionId');
-      if (!sid) {
-        sid = crypto.randomUUID();
-        window.localStorage.setItem('demoSessionId', sid);
-      }
-      return sid;
-    } catch {
-      return crypto.randomUUID();
-    }
-  });
-
-  const [messages, setMessages] = useState<{fromUser:boolean; text:string}[]>([]);
+  const [messages, setMessages] = useState<
+    { fromUser: boolean; text: string }[]
+  >([]);
   const fullIntro = "hi, i'm ishaan";
   const [typedIntro, setTypedIntro] = useState("");
   const [showIntro, setShowIntro] = useState(true);
@@ -82,7 +155,8 @@ export default function Home() {
   useEffect(() => {
     if (scrollRef.current && messages.length > 0) {
       const lastMessageIndex = messages.length - 1;
-      const messageElements = scrollRef.current.querySelectorAll('[data-message]');
+      const messageElements =
+        scrollRef.current.querySelectorAll("[data-message]");
       if (messageElements.length > 0) {
         const lastMessage = messageElements[lastMessageIndex] as HTMLElement;
         if (lastMessage) {
@@ -94,34 +168,34 @@ export default function Home() {
   }, [messages]);
 
   const send = async (text: string) => {
-    if (isCheckingPrivateMode || isPrivateMode) return;
-    
+    if (isCheckingPrivateMode || isPrivateMode || isCheckingAuth) return;
+
     setShowIntro(false);
     setMessages([...messages, { fromUser: true, text }]);
-    
+
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-Session-Id': sessionId,
+        "Content-Type": "application/json",
+        "X-Session-Id": sessionId,
       };
       if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+        headers["Authorization"] = `Bearer ${session.access_token}`;
       }
 
-      const res = await fetch(apiURL + '/chat', {
-        method: 'POST',
+      const res = await fetch(apiURL + "/chat", {
+        method: "POST",
         headers,
         body: JSON.stringify({ question: text }),
       });
-      
+
       if (res.status === 401) {
         // user has been revoked or session expired
         await supabase.auth.signOut();
-        router.replace('/login');
+        router.replace("/login");
         return;
       }
 
@@ -129,7 +203,7 @@ export default function Home() {
         // If the user was logged in, a 403 now means "revoked"
         if (session?.access_token) {
           await supabase.auth.signOut();
-          router.replace('/login');
+          router.replace("/login");
           return;
         }
         // Otherwise it's demo-limit
@@ -140,14 +214,31 @@ export default function Home() {
         alert(`Error: ${res.status} ${res.statusText}`);
         return;
       }
-      
+
       const { answer } = await res.json();
-      setMessages(prev => [...prev, { fromUser: false, text: answer }]);
+      setMessages((prev) => [...prev, { fromUser: false, text: answer }]);
     } catch (error) {
-      console.error('Chat request failed', error);
-      alert('Network error—please try again.');
+      console.error("Chat request failed", error);
+      alert("Network error—please try again.");
     }
   };
+
+  if (isCheckingAuth) {
+    return (
+      <div className="h-screen flex flex-col bg-gradient-to-br from-gray-900 via-black to-gray-800">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-white">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-lg">Checking authentication...</p>
+            <p className="text-sm text-gray-400 mt-2">
+              Verifying access permissions
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isCheckingPrivateMode) {
     return (
@@ -157,7 +248,9 @@ export default function Home() {
           <div className="text-center text-white">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
             <p className="text-lg">Verifying browser environment...</p>
-            <p className="text-sm text-gray-400 mt-2">Checking for private browsing</p>
+            <p className="text-sm text-gray-400 mt-2">
+              Checking for private browsing
+            </p>
           </div>
         </div>
       </div>
@@ -171,15 +264,24 @@ export default function Home() {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center text-white max-w-lg mx-auto px-4">
             <div className="text-6xl mb-6">🚫</div>
-            <h2 className="text-3xl font-bold mb-4 text-red-400">Private Browsing Not Supported</h2>
+            <h2 className="text-3xl font-bold mb-4 text-red-400">
+              Private Browsing Not Supported
+            </h2>
             <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-6 mb-6">
               <p className="text-gray-200 mb-4">
-                This demo requires full browser storage capabilities to function properly.
+                This demo requires full browser storage capabilities to function
+                properly.
               </p>
               <div className="text-left text-sm text-gray-300 space-y-2">
-                <p>• <strong>Chrome:</strong> Exit Incognito mode</p>
-                <p>• <strong>Safari:</strong> Turn off Private Browsing</p>
-                <p>• <strong>Firefox:</strong> Exit Private Window</p>
+                <p>
+                  • <strong>Chrome:</strong> Exit Incognito mode
+                </p>
+                <p>
+                  • <strong>Safari:</strong> Turn off Private Browsing
+                </p>
+                <p>
+                  • <strong>Firefox:</strong> Exit Private Window
+                </p>
               </div>
             </div>
             <div className="flex items-center justify-center text-gray-400">
@@ -195,7 +297,7 @@ export default function Home() {
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-gray-900 via-black to-gray-800">
       <Navbar />
-      
+
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="px-4 py-2 min-h-full flex flex-col">
           <AnimatePresence>
@@ -212,7 +314,11 @@ export default function Home() {
                   <motion.span
                     initial={{ opacity: 0 }}
                     animate={{ opacity: [0, 1] }}
-                    transition={{ repeat: Infinity, repeatType: 'loop', duration: 0.7 }}
+                    transition={{
+                      repeat: Infinity,
+                      repeatType: "loop",
+                      duration: 0.7,
+                    }}
                     className="inline-block"
                   >
                     |
@@ -226,7 +332,7 @@ export default function Home() {
           </ChatLayout>
         </div>
       </div>
-      
+
       {isDemoBlocked && (
         <div className="fixed bottom-20 left-0 right-0 px-4">
           <div className="max-w-2xl mx-auto bg-red-600 text-white p-3 rounded-lg text-center">
@@ -238,13 +344,18 @@ export default function Home() {
           </div>
         </div>
       )}
-      
+
       <div className="fixed bottom-3 left-0 right-0 px-4 py-2 flex justify-center">
         <div className="w-full max-w-2xl">
-          <InputBar 
-            onSend={send} 
-            onInput={() => setShowIntro(false)} 
-            disabled={isDemoBlocked || isCheckingPrivateMode || isPrivateMode} 
+          <InputBar
+            onSend={send}
+            onInput={() => setShowIntro(false)}
+            disabled={
+              isDemoBlocked ||
+              isCheckingPrivateMode ||
+              isPrivateMode ||
+              isCheckingAuth
+            }
           />
         </div>
       </div>

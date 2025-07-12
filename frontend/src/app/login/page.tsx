@@ -19,15 +19,32 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
         setErrorMsg(error.message);
-      } else {
-        router.push('/admin');
+      } else if (data.user) {
+        // Check user role from profiles table
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError);
+          // Default to chat if profile fetch fails
+          router.push('/');
+        } else if (profile?.role === 'admin') {
+          // Redirect admin to admin page
+          router.push('/admin');
+        } else {
+          // Redirect regular users to chat
+          router.push('/');
+        }
       }
     } catch (error: unknown) {
       console.error('Login error:', error);
@@ -170,7 +187,7 @@ export default function LoginPage() {
               onClick={() => router.push('/')}
               className="text-gray-400 hover:text-white text-sm transition-colors duration-200"
             >
-              ← Back to Demo
+              ← Back to Chat
             </button>
           </motion.div>
         </motion.div>

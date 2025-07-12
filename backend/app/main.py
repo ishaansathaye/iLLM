@@ -1,4 +1,6 @@
 # backend/app/main.py
+from app.routers.register import router as register_router
+from app.routers.ingest import router as ingest_router
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends
@@ -24,16 +26,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class Query(BaseModel):
     question: str
 
+
 # Register admin ingestion routes
-from app.routers.ingest import router as ingest_router
 app.include_router(ingest_router)
 
 # Register admin registration routes
-from app.routers.register import router as register_router
 app.include_router(register_router)
+
+
+@app.get("/auth/verify")
+def verify_auth(role: str = Depends(get_current_role)):
+    """Simple endpoint to verify if user's authentication is still valid"""
+    return {"status": "valid", "role": role}
+
 
 @app.post("/chat")
 def chat(query: Query, role: str = Depends(get_current_role)):
