@@ -14,6 +14,7 @@ export default function Home() {
   const [isCheckingPrivateMode, setIsCheckingPrivateMode] = useState(true);
   const [isPrivateMode, setIsPrivateMode] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isUserRevoked, setIsUserRevoked] = useState(false);
 
   const apiURL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -53,14 +54,16 @@ export default function Home() {
             if (testResponse.status === 401 || testResponse.status === 403) {
               // User has been revoked or session expired
               await supabase.auth.signOut();
-              router.replace("/login");
+              setIsUserRevoked(true);
+              setIsCheckingAuth(false);
               return;
             }
           } catch (error) {
             console.error("Error checking logged-in user auth:", error);
             // If auth check fails for logged-in user, sign them out to be safe
             await supabase.auth.signOut();
-            router.replace("/login");
+            setIsUserRevoked(true);
+            setIsCheckingAuth(false);
             return;
           }
         }
@@ -99,14 +102,17 @@ export default function Home() {
     } = supabase.auth.onAuthStateChange(async (event) => {
       if (event === "SIGNED_OUT") {
         // User explicitly signed out - redirect to login
-        router.replace("/login");
+        // But don't redirect if they were revoked (let them see the popup)
+        if (!isUserRevoked) {
+          router.replace("/login");
+        }
       }
       // Don't redirect on TOKEN_REFRESHED or other events
       // Let the periodic auth check handle revoked users
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, [router, isUserRevoked]);
 
   // Simple and reliable private browsing detection using detectIncognito.js
   useEffect(() => {
@@ -176,7 +182,7 @@ export default function Home() {
   }, [messages]);
 
   const send = async (text: string) => {
-    if (isCheckingPrivateMode || isPrivateMode || isCheckingAuth) return;
+    if (isCheckingPrivateMode || isPrivateMode || isCheckingAuth || isUserRevoked) return;
 
     setShowIntro(false);
     setMessages([...messages, { fromUser: true, text }]);
@@ -203,7 +209,7 @@ export default function Home() {
       if (res.status === 401) {
         // user has been revoked or session expired
         await supabase.auth.signOut();
-        router.replace("/login");
+        setIsUserRevoked(true);
         return;
       }
 
@@ -211,7 +217,7 @@ export default function Home() {
         // If the user was logged in, a 403 now means "revoked"
         if (session?.access_token) {
           await supabase.auth.signOut();
-          router.replace("/login");
+          setIsUserRevoked(true);
           return;
         }
         // Otherwise it's demo-limit
@@ -341,6 +347,29 @@ export default function Home() {
         </div>
       </div>
 
+      {isUserRevoked && (
+        <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
+          <div className="max-w-2xl mx-auto bg-red-600 text-white p-4 rounded-lg text-center border border-red-500">
+            <div className="text-lg font-semibold mb-2">🚫 Access Revoked</div>
+            <p className="text-sm mb-3">
+              Your account access has been revoked. You can continue using the demo version.
+            </p>
+            <button
+              onClick={() => {
+                setIsUserRevoked(false);
+                // Clear any existing session data
+                window.localStorage.removeItem('demoSessionId');
+                // Refresh the page to start fresh as demo user
+                window.location.reload();
+              }}
+              className="bg-white text-red-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
+            >
+              Continue as Demo User
+            </button>
+          </div>
+        </div>
+      )}
+
       {isDemoBlocked && (
         <div className="fixed bottom-20 left-0 right-0 px-4">
           <div className="max-w-2xl mx-auto bg-red-600 text-white p-3 rounded-lg text-center">
@@ -362,7 +391,8 @@ export default function Home() {
               isDemoBlocked ||
               isCheckingPrivateMode ||
               isPrivateMode ||
-              isCheckingAuth
+              isCheckingAuth ||
+              isUserRevoked
             }
           />
         </div>
