@@ -118,16 +118,21 @@ export default function Home() {
         body: JSON.stringify({ question: text }),
       });
       
-      console.log('API response status:', res.status);
-      console.log('API response headers:', Array.from(res.headers.entries()));
       if (res.status === 401) {
         // user has been revoked or session expired
         await supabase.auth.signOut();
         router.replace('/login');
         return;
       }
-      
+
       if (res.status === 403) {
+        // If the user was logged in, a 403 now means "revoked"
+        if (session?.access_token) {
+          await supabase.auth.signOut();
+          router.replace('/login');
+          return;
+        }
+        // Otherwise it's demo-limit
         setIsDemoBlocked(true);
         return;
       }
