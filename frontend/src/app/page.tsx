@@ -40,35 +40,32 @@ export default function Home() {
         } = await supabase.auth.getSession();
 
         if (session?.access_token) {
-          // Test if the user's access is still valid by making a simple request
-          const testResponse = await fetch(`${apiURL}/auth/verify`, {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              "X-Session-Id": sessionId,
-            },
-          });
+          // Only check auth for logged-in users
+          try {
+            const testResponse = await fetch(`${apiURL}/auth/verify`, {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                "X-Session-Id": sessionId,
+              },
+            });
 
-          if (testResponse.status === 401 || testResponse.status === 403) {
-            // User has been revoked or session expired
+            if (testResponse.status === 401 || testResponse.status === 403) {
+              // User has been revoked or session expired
+              await supabase.auth.signOut();
+              router.replace("/login");
+              return;
+            }
+          } catch (error) {
+            console.error("Error checking logged-in user auth:", error);
+            // If auth check fails for logged-in user, sign them out to be safe
             await supabase.auth.signOut();
             router.replace("/login");
             return;
           }
-        } else {
-          // For demo users, test with session ID only
-          const testResponse = await fetch(`${apiURL}/auth/verify`, {
-            method: "GET",
-            headers: {
-              "X-Session-Id": sessionId,
-            },
-          });
-
-          if (testResponse.status === 403) {
-            // Demo limit reached
-            setIsDemoBlocked(true);
-          }
         }
+        // For demo users (no session), we don't need to check auth upfront
+        // They'll be checked when they try to send messages
 
         setIsCheckingAuth(false);
       } catch (error) {
@@ -80,8 +77,17 @@ export default function Home() {
     // Check auth status on page load
     checkAuthStatus();
 
-    // Set up periodic auth check every 30 seconds
-    const authCheckInterval = setInterval(checkAuthStatus, 30000);
+    // Set up periodic auth check every 30 seconds, but only for logged-in users
+    const authCheckInterval = setInterval(async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      
+      if (session?.access_token) {
+        // Only run periodic checks for logged-in users
+        checkAuthStatus();
+      }
+    }, 30000);
 
     return () => clearInterval(authCheckInterval);
   }, [router, apiURL, sessionId]);
@@ -90,11 +96,13 @@ export default function Home() {
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_OUT" || !session) {
-        // User signed out or session expired
+    } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === "SIGNED_OUT") {
+        // User explicitly signed out - redirect to login
         router.replace("/login");
       }
+      // Don't redirect on TOKEN_REFRESHED or other events
+      // Let the periodic auth check handle revoked users
     });
 
     return () => subscription.unsubscribe();
