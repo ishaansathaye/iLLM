@@ -207,20 +207,15 @@ export default function Home() {
       });
 
       if (res.status === 401) {
-        // user has been revoked or session expired
-        await supabase.auth.signOut();
         setIsUserRevoked(true);
         return;
       }
 
       if (res.status === 403) {
-        // If the user was logged in, a 403 now means "revoked"
         if (session?.access_token) {
-          await supabase.auth.signOut();
           setIsUserRevoked(true);
           return;
         }
-        // Otherwise it's demo-limit
         setIsDemoBlocked(true);
         return;
       }
