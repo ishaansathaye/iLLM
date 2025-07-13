@@ -1,7 +1,28 @@
 import os
 from fastapi import Depends, HTTPException, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from datetime import datetime
+from datetime import datetime, timedelta
+from datetime import timezone
+
+# Helper to safely parse ISO timestamps with variable fractional seconds and offset
+def _parse_expires(ts: str) -> datetime:
+    """
+    Safely parse an ISO timestamp with variable fractional seconds and offset.
+    """
+    try:
+        return datetime.fromisoformat(ts)
+    except ValueError:
+        # Handle non-standard fractional lengths
+        if '+' in ts:
+            main, off = ts.split('+', 1)
+            if '.' in main:
+                datepart, frac = main.split('.', 1)
+                # pad or trim to 6 digits
+                frac = (frac + "000000")[:6]
+                clean = f"{datepart}.{frac}+{off}"
+                return datetime.fromisoformat(clean)
+        # fallback re-raise
+        raise
 from app.lib.supabase_client import supabase
 from postgrest.exceptions import APIError
 
@@ -62,35 +83,54 @@ async def get_current_role(
     if not session_id:
         raise HTTPException(status_code=401, detail="Missing X-Session-Id header")
 
-    # 3) Fetch or initialize demo_sessions counter
+    # Fetch existing demo session (hit_count, created_at, expires_at)
     try:
         resp = (
             supabase
             .table("demo_sessions")
-            .select("hit_count")
+            .select("hit_count, created_at, expires_at")
             .eq("session_id", session_id)
             .maybe_single()
             .execute()
         )
         row = getattr(resp, "data", None)
     except APIError:
-        # No rows or multiple rows returned; treat as no existing session
         row = None
 
+    # If found and expired, delete to reset
     if row:
-        count = row.get("hit_count", 0) + 1
-        # update existing
-        supabase.table("demo_sessions") \
-            .update({"hit_count": count, "last_hit": datetime.utcnow().isoformat()}) \
-            .eq("session_id", session_id).execute()
-    else:
-        count = 1
-        # insert new
-        supabase.table("demo_sessions") \
-            .insert({"session_id": session_id, "hit_count": 1, "last_hit": datetime.utcnow().isoformat()}) \
-            .execute()
+        expires_at = _parse_expires(row["expires_at"])
+        if expires_at < datetime.now(timezone.utc):
+            supabase.table("demo_sessions") \
+                .delete() \
+                .eq("session_id", session_id) \
+                .execute()
+            row = None
 
-    if count > DEMO_LIMIT:
-        raise HTTPException(status_code=403, detail="Demo limit reached")
+    # If no active session, create new with count=1 and 24h TTL
+    if not row:
+        now = datetime.now(timezone.utc)
+        expiry = (now + timedelta(hours=24)).isoformat()
+        supabase.table("demo_sessions") \
+            .insert({
+                "session_id": session_id,
+                "hit_count": 1,
+                "created_at": now.isoformat(),
+                "expires_at": expiry
+            }) \
+            .execute()
+    else:
+        # Enforce quota
+        count = row.get("hit_count", 0)
+        if count >= DEMO_LIMIT:
+            raise HTTPException(status_code=403, detail="Demo limit reached")
+        # Increment count
+        supabase.table("demo_sessions") \
+            .update({
+                "hit_count": count + 1,
+                "last_hit": datetime.now(timezone.utc).isoformat()
+            }) \
+            .eq("session_id", session_id) \
+            .execute()
 
     return "demo"
