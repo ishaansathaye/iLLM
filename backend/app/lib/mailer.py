@@ -13,10 +13,37 @@ def send_user_password_email(to_email: str, password: str, expires_at: str):
     if not SG_API_KEY:
         raise RuntimeError("SENDGRID_API_KEY is not set")
 
+    # Format the expiration time for better readability
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    try:
+        # Parse the ISO format datetime string
+        expires_dt = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+
+        # Format in multiple timezones
+        utc_time = expires_dt.strftime("%B %d, %Y at %I:%M %p UTC")
+
+        # Convert to common timezones
+        et_time = expires_dt.astimezone(
+            ZoneInfo('US/Eastern')).strftime("%I:%M %p ET")
+        pt_time = expires_dt.astimezone(
+            ZoneInfo('US/Pacific')).strftime("%I:%M %p PT")
+        cet_time = expires_dt.astimezone(
+            ZoneInfo('Europe/Berlin')).strftime("%I:%M %p CET")
+
+        formatted_expires = utc_time
+        timezone_info = f"({et_time} • {pt_time} • {cet_time})"
+
+    except (ValueError, AttributeError, ImportError):
+        # Fallback if parsing fails or zoneinfo not available
+        formatted_expires = expires_at
+        timezone_info = ""
+
     message = Mail(
         from_email=FROM_EMAIL,
         to_emails=to_email,
-        subject="🔐 Your iLLM One-Time Access Password",
+        subject="🔐 Your iLLM Access Password",
         html_content=f"""
         <!DOCTYPE html>
         <html lang="en">
@@ -31,21 +58,21 @@ def send_user_password_email(to_email: str, password: str, expires_at: str):
                 <!-- Header -->
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
                     <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">
-                        🚀 iLLM
+                        iLLM
                     </h1>
                     <p style="margin: 8px 0 0 0; font-size: 16px; color: #e2e8f0; opacity: 0.9;">
-                        Intelligent Language Learning Model
+                        ishaan's Large Language Model
                     </p>
                 </div>
                 
                 <!-- Content -->
                 <div style="padding: 40px 30px;">
                     <h2 style="margin: 0 0 20px 0; font-size: 24px; font-weight: 600; color: #1e293b;">
-                        Your One-Time Access Password
+                        Your Access Password
                     </h2>
                     
                     <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #64748b;">
-                        Welcome! We've generated a secure one-time password for you to access iLLM. Use this password to log in to your account.
+                        Welcome! I've generated a secure access password for you to access iLLM. Use this password to log in to your account.
                     </p>
                     
                     <!-- Password Box -->
@@ -57,7 +84,7 @@ def send_user_password_email(to_email: str, password: str, expires_at: str):
                             {password}
                         </div>
                         <p style="margin: 8px 0 0 0; font-size: 12px; color: #94a3b8;">
-                            Click to select • Copy and paste this password
+                            Copy and paste this password
                         </p>
                     </div>
                     
@@ -70,7 +97,10 @@ def send_user_password_email(to_email: str, password: str, expires_at: str):
                                     Time-Sensitive Access
                                 </p>
                                 <p style="margin: 4px 0 0 0; font-size: 13px; color: #b45309;">
-                                    This password expires on <strong>{expires_at} UTC</strong>
+                                    This password expires on <strong>{formatted_expires}</strong>
+                                </p>
+                                <p style="margin: 6px 0 0 0; font-size: 11px; color: #d97706; font-style: italic;">
+                                    {timezone_info}
                                 </p>
                             </div>
                         </div>
@@ -86,12 +116,13 @@ def send_user_password_email(to_email: str, password: str, expires_at: str):
                             <li style="margin-bottom: 8px;">Copy the password above</li>
                             <li style="margin-bottom: 8px;">Go to the iLLM login page</li>
                             <li style="margin-bottom: 8px;">Enter your email and this password</li>
-                            <li>Start using iLLM immediately!</li>
+                            <li>Ask unlimited questions until your account expires!</li>
+                            <li>Continue asking questions in the demo mode after your account expires.</li>
                         </ol>
                     </div>
                     
                     <p style="margin: 24px 0 0 0; font-size: 14px; line-height: 1.6; color: #64748b;">
-                        If you didn't request this password or have any questions, please contact our support team.
+                        If you didn't request this password or have any questions, please contact me from the website.
                     </p>
                 </div>
                 
