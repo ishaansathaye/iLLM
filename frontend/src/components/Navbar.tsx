@@ -247,7 +247,14 @@ export default function Navbar() {
 
   // Format the demo quota status for display
   const formatDemoStatus = () => {
-    if (role !== "demo") return "♾️ ∞";
+    if (role !== "demo") {
+      // Show informative status for authenticated users
+      if (role === "admin") {
+        return "Admin Access";
+      } else {
+        return "Unlimited Requests for 24 hours from Account Creation";
+      }
+    }
 
     const requests =
       typeof requestsLeft === "number" ? requestsLeft : DEMO_LIMIT;
